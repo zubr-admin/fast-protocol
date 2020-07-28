@@ -1,0 +1,106 @@
+
+/* Globals */
+
+:root {
+    --sidebar-width: 300px;
+    --page-padding: 15px;
+    --content-max-width: 1000px;
+
+    --bg: hsl(0, 0%, 100%);
+    --fg: #333333;
+
+    --sidebar-bg: #fafafa;
+    --sidebar-fg: #364149;
+    --sidebar-non-existant: #aaaaaa;
+    --sidebar-active: #008cff;
+    --sidebar-spacer: #f4f4f4;
+
+    --scrollbar: #cccccc;
+
+    --icons: #cccccc;
+    --icons-hover: #333333;
+
+    --links: #4183c4;
+
+    --inline-code-color: #6e6b5e;
+
+    --theme-popup-bg: #fafafa;
+    --theme-popup-border: #cccccc;
+    --theme-hover: #e6e6e6;
+
+    --quote-bg: hsl(197, 37%, 96%);
+    --quote-border: hsl(197, 37%, 91%);
+
+    --table-border-color: hsl(0, 0%, 95%);
+    --table-header-bg: hsl(0, 0%, 80%);
+    --table-alternate-bg: hsl(0, 0%, 97%);
+
+    --searchbar-border-color: #aaa;
+    --searchbar-bg: #fafafa;
+    --searchbar-fg: #000;
+    --searchbar-shadow-color: #aaa;
+    --searchresults-header-fg: #666;
+    --searchresults-border-color: #888;
+    --searchresults-li-bg: #e4f2fe;
+    --search-mark-bg: #a2cff5;
+}
+
+/* Base styles and content styles */
+
+
+html {
+    font-family: "Open Sans", sans-serif;
+    color: var(--fg);
+    background-color: var(--bg);
+    text-size-adjust: none;
+}
+
+body {
+    font-size: 1rem;
+    max-width: var(--content-max-width);
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 4em;
+}
+
+code {
+    font-family: "Source Code Pro", Consolas, "Ubuntu Mono", Menlo, "DejaVu Sans Mono", monospace, monospace;
+}
+
+h2, h3 { margin-top: 2.5em; }
+h4, h5 { margin-top: 2em; }
+
+img { max-width: 100%; }
+
+table {
+    margin: 0 auto;
+    border-collapse: collapse;
+}
+table td {
+    padding: 3px 20px;
+    border: 1px var(--table-border-color) solid;
+}
+table thead {
+    background: var(--table-header-bg);
+}
+table thead td {
+    font-weight: 700;
+    border: none;
+}
+table thead tr {
+    border: 1px var(--table-header-bg) solid;
+}
+/* Alternate background colors for rows */
+table tbody tr:nth-child(2n) {
+    background: var(--table-alternate-bg);
+}
+
+blockquote {
+    margin: 20px 0;
+    padding: 0 20px;
+    color: var(--fg);
+    background-color: var(--quote-bg);
+    border-top: .1em solid var(--quote-border);
+    border-bottom: .1em solid var(--quote-border);
+}
+

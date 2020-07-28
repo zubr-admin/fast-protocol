@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>market_data_gate</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+  <link rel="stylesheet" href="style.css" />
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<h1 id="market-data-gate">Market Data Gate</h1>
+<p>The market data gate broadcasts the following information:</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 75%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Feed</th>
+<th>Data</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>System events</td>
+<td>Various system events</td>
+</tr>
+<tr class="even">
+<td>Instrument definitions</td>
+<td>The instruments available on the exchange and their trading status</td>
+</tr>
+<tr class="odd">
+<td>Instrument statuses</td>
+<td>Changes of the instrument’s properties</td>
+</tr>
+<tr class="even">
+<td>Orders snapshots</td>
+<td>Full order book</td>
+</tr>
+<tr class="odd">
+<td>Orders incremental</td>
+<td>Anonymous feed of orders</td>
+</tr>
+<tr class="even">
+<td>Book1 snapshots</td>
+<td>Top of the book</td>
+</tr>
+<tr class="odd">
+<td>Book1 incremental</td>
+<td>Changes in the top of the book</td>
+</tr>
+<tr class="even">
+<td>Book5 snapshots</td>
+<td>Aggregated order book with 5 depth</td>
+</tr>
+<tr class="odd">
+<td>Book5 incremental</td>
+<td>Changes in Book5</td>
+</tr>
+<tr class="even">
+<td>Book25 snapshots</td>
+<td>Aggregated order book with 25 depth</td>
+</tr>
+<tr class="odd">
+<td>Book25 incremental</td>
+<td>Changes in Book25</td>
+</tr>
+<tr class="even">
+<td>Trades snapshots</td>
+<td>Last trade</td>
+</tr>
+<tr class="odd">
+<td>Trades incremental</td>
+<td>Anonymous feed of trades</td>
+</tr>
+</tbody>
+</table>
+<h2 id="transfer-and-encoding">Transfer and encoding</h2>
+<p>The market data is transmitted as UDP multicast traffic. The market data receivers will be provided with a receiving interface IPv4 address and a multicast IPv4 address for each feed.</p>
+<p>The UDP packet payload consists of two parts:</p>
+<ul>
+<li>A header: it defines the value of <code>MessageSequenceNo</code> (FIX tag 34) encoded as a <code>uint64</code> number (little endian)</li>
+<li>A message in FIX/FAST encoding</li>
+</ul>
+<p>Messages are encoded according to the FAST 1.x.1 standard with FAST version 1.2 Extension Version 10. The provided XML templates should be used for decoding the messages.</p>
+<p>The Financial Information Exchange protocol (FIX) Version 5.0 Service Pack 2 is used for the messages. However, some fields differ from the FIX standard, when necessary.</p>
+<p>If the information to be sent doesn’t fit in a single UDP packet, it will be split into multiple FIX/FAST messages which are sent sequentially, as allowed by the FIX standard. The <code>FirstFragment</code> and <code>LastFragment</code> fields can be used to determine that these messages are parts of a single update.</p>
+<h2 id="notation">Notation</h2>
+<p>The <code>=&gt;</code> sign in the Tag column indicates that this field is a part of a repeated sequence.</p>
+<p>Fields marked as <code>optional</code> can have no value in some particular messages. They are encoded as specified in the FAST standard. All fields that are not marked as optional are always present.</p>
+<p>Fields marked as <code>const</code> are never encoded and always have the same value specified in the XML template.</p>
+<p>Please note that field names, types, tag names, optional and const attributes are specified in the XML template as well.</p>
+<h2 id="snapshots-and-incremental-updates">Snapshots and incremental updates</h2>
+<p>The connection to the live market data feeds is usually done in the following steps:</p>
+<ol type="1">
+<li>Subscribe to the incremental feed and start receiving update messages</li>
+<li>Subscribe to the snapshot feed, receive a snapshot for each instrument of interest, and unsubscribe from the snapshot feed</li>
+<li>For each instrument, discard received incremental updates that have <code>RptSeq</code> smaller or equal to the <code>RptSeq</code> of the received snapshot for this instrument</li>
+<li>Apply the remaining incremental updates to the corresponding snapshots</li>
+<li>Keep updating the data as new incremental updates are received</li>
+</ol>
+<p>The data is sent to the snapshot feeds in fixed time intervals. The data is sent for each instrument separately. The <code>TotNumReports</code> field present in each snapshot message can be used to determine if a snapshot for each available instrument has been received.</p>
+<h2 id="compatibility-notes">Compatibility notes</h2>
+<p>All the messages contain reserved fields that are currently unused. It might be possible to use these fields in the future, after forward-compatible changes are made to the template.</p>
+<p>In addition, new fields may be added to the end of each message. Parsers should ignore unparsed data that may be present at the end of a message.</p>
+<h2 id="recovery-gate">Recovery gate</h2>
+<p>Lost packets can be requested from the recovery gate. The recovery gate can be accessed via the HTTP protocol.</p>
+<h3 id="get-packets">Get packets</h3>
+<p>Endpoint URL: <code>/v1/[feed]</code>, where <code>[feed]</code> can be one of the following values:</p>
+<table>
+<thead>
+<tr class="header">
+<th><code>[feed]</code></th>
+<th>Feed</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>orders-incremental</code></td>
+<td>Orders incremental</td>
+</tr>
+<tr class="even">
+<td><code>trades-incremental</code></td>
+<td>Trades incremental</td>
+</tr>
+<tr class="odd">
+<td><code>book1-incremental</code></td>
+<td>Book1 incremental</td>
+</tr>
+<tr class="even">
+<td><code>book5-incremental</code></td>
+<td>Book5 incremental</td>
+</tr>
+<tr class="odd">
+<td><code>book25-incremental</code></td>
+<td>Book25 incremental</td>
+</tr>
+</tbody>
+</table>
+<p>Other feeds are not available for receiving via the recovery gate.</p>
+<p>GET parameters:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>from</code></td>
+<td><code>MessageSequenceNo</code> of the first requested message</td>
+</tr>
+<tr class="even">
+<td><code>count</code></td>
+<td>Number of requested messages</td>
+</tr>
+</tbody>
+</table>
+<p>The number of messages that can be requested in a single request is limited. The time frame of the available packets is also limited.</p>
+<p>In case of success, the status code 200 will be returned. The body of the response will contain binary data of the requested packets with length-delimited encoding:</p>
+<p><code>[length of packet1] [data of packet1] [length of packet2] [data of packet2] ...</code></p>
+<p>The length value is encoded as a <code>uint64</code> in Little Endian. Packet data uses FIX/FAST and it is identical to the UDP payload in the multicast feed.</p>
+<p>If no packets matching the parameters were found or the requested packets are too old, the status code 404 is returned.</p>
+<p>The most recent packets may not be available via the recovery gate. In this case the request should be resent after a delay.</p>
+<p>In case of an invalid request, status code 400 is returned.</p>
+<p>The number of requests per second is limited. If a client exceeded the RPS limit, status code 429 is returned.</p>
+<h2 id="header">Header</h2>
+<p>Each message is started with the <code>StandardHeader</code>:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+<th>Type &amp; presence</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1128</td>
+<td><code>AppliedVersionId</code></td>
+<td><code>string</code> (const)</td>
+<td>FIX version ID</td>
+</tr>
+<tr class="even">
+<td>35</td>
+<td><code>MessageType</code></td>
+<td><code>string</code> (const)</td>
+<td>Message type</td>
+</tr>
+<tr class="odd">
+<td>34</td>
+<td><code>MessageSequenceNo</code></td>
+<td><code>uint64</code></td>
+<td>Sequential message number</td>
+</tr>
+<tr class="even">
+<td>52</td>
+<td><code>SendingTime</code></td>
+<td><code>timestamp</code></td>
+<td>Sending time</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>MessageType</code> value corresponding to each message type is specified below in the description of each message.</p>
+<h2 id="session-level-and-application-level">Session level and application level</h2>
+<p>The heartbeat and sequence reset are session level messages. Session level messages can be present in every feed.</p>
+<p>Other messages are related to the application level. Each message can only appear in the corresponding feed.</p>
+<h2 id="messages-reference">Messages reference</h2>
+<p><em>Version 2</em></p>
+<h3 id="sequencereset">SequenceReset</h3>
+<p><code>SequenceReset</code> is the message sent when the gate resets its message counter. After the sequence reset is sent, the next message will get the specified <code>MsgSeqNum</code>.</p>
+<p><code>MessageType</code> = “4” (Sequence reset)</p>
+<table>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 23%" />
+<col style="width: 11%" />
+<col style="width: 58%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>36</td>
+<td><code>NewSequenceNo</code></td>
+<td><code>uInt64</code></td>
+<td>Sequence number of the next message in the feed (FIX name: NewSeqNo)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="heartbeat">Heartbeat</h3>
+<p>The <code>Heartbeat</code> message is sent to a feed when there haven’t been any other messages for some time. The heartbeat message doesn’t have any additional fields except the standard header.</p>
+<p><code>MessageType</code> = “0” (Heartbeat)</p>
+<h3 id="ordersincrementalupdate">OrdersIncrementalUpdate</h3>
+<p>The <code>OrdersIncrementalUpdate</code> message is used to show the following actions: adding, updating, or deleting of an order.</p>
+<p><code>MessageType</code> = “X” (Market Data - Incremental Refresh)</p>
+<table>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 23%" />
+<col style="width: 11%" />
+<col style="width: 58%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>5006</td>
+<td><code>FirstFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the first fragment of the update</td>
+</tr>
+<tr class="even">
+<td>893</td>
+<td><code>LastFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the last fragment of the update</td>
+</tr>
+<tr class="odd">
+<td>268</td>
+<td><code>EntryCount</code></td>
+<td><code>length</code></td>
+<td>Number of MDEntry in this message (FIX name: NoMDEntries)</td>
+</tr>
+<tr class="even">
+<td>=&gt;83</td>
+<td><code>ReportSequenceNo</code></td>
+<td><code>uInt64</code></td>
+<td>Report sequence ID (unique monotonically increasing ID, separately for each instrument) (FIX name: RptSeq)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;279</td>
+<td><code>UpdateAction</code></td>
+<td><code>enum</code></td>
+<td>Type of the incremental update. Not present if entry type is EmptyBook (FIX name: MDUpdateAction). Variants: <code>0</code> - New, <code>1</code> - Change, <code>2</code> - Delete</td>
+</tr>
+<tr class="even">
+<td>=&gt;278</td>
+<td><code>Id</code></td>
+<td><code>uInt64</code></td>
+<td>Order ID. Not present if entry type is EmptyBook (FIX name: MDEntryID)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;269</td>
+<td><code>EntryType</code></td>
+<td><code>enum</code></td>
+<td>Entry type (FIX name: MDEntryType). Variants: <code>0</code> - Buy, <code>1</code> - Sell, <code>J</code> - EmptyBook</td>
+</tr>
+<tr class="even">
+<td>=&gt;48</td>
+<td><code>InstrumentId</code></td>
+<td><code>uInt32</code></td>
+<td>Instrument ID (FIX name: SecurityId)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;270</td>
+<td><code>Price</code></td>
+<td><code>decimal</code></td>
+<td>Order price. Not present if entry type is EmptyBook (FIX name: MDEntryPx)</td>
+</tr>
+<tr class="even">
+<td>=&gt;271</td>
+<td><code>Size</code></td>
+<td><code>int32</code></td>
+<td>Depends on the update type: for New - order size; for Change - remaining order size; for Delete - remaining size of the order before deletion. Not present if entry type is EmptyBook (FIX name: MDEntrySize)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;40</td>
+<td><code>OrderType</code></td>
+<td><code>enum</code></td>
+<td>Order type. Not present if entry type is EmptyBook (FIX name: OrdType). Variants: <code>2</code> - Limit, <code>1</code> - Market, <code>101</code> - PostOnly</td>
+</tr>
+<tr class="even">
+<td>=&gt;59</td>
+<td><code>TimeInForce</code></td>
+<td><code>enum</code></td>
+<td>Time in force. Not present if entry type is EmptyBook. Variants: <code>1</code> - GoodTillCancel (GTC), <code>3</code> - ImmediateOrCancel (IOC), <code>4</code> - FillOrKill (FOK)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;5007</td>
+<td><code>DeleteReason</code></td>
+<td><code>enum</code></td>
+<td>Reason of deletion. Only present when <code>UpdateAction</code> = 2 (Delete). Variants: <code>Fulfilled</code>, <code>OrderType</code>, <code>TimeInForce</code>, <code>CrossTrade</code>, <code>CancelRequest</code>, <code>ReplaceRequest</code>, <code>Liquidation</code></td>
+</tr>
+<tr class="even">
+<td>=&gt;1003</td>
+<td><code>TradeId</code></td>
+<td><code>uInt64</code></td>
+<td>ID of the trade that caused this update. Only present for updates caused by order execution</td>
+</tr>
+<tr class="odd">
+<td>=&gt;31</td>
+<td><code>TradePrice</code></td>
+<td><code>decimal</code></td>
+<td>Price of the trade that caused this update. Only present for updates caused by order execution (FIX name: LastPx)</td>
+</tr>
+<tr class="even">
+<td>=&gt;32</td>
+<td><code>TradeSize</code></td>
+<td><code>int32</code></td>
+<td>Size of the trade that caused this update. Only present for updates caused by order execution (FIX name: LastQty)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;273</td>
+<td><code>TradingTimestamp</code></td>
+<td><code>timestamp</code></td>
+<td>Time of the update (FIX name: MDEntryTime)</td>
+</tr>
+<tr class="even">
+<td>=&gt;5005</td>
+<td><code>EndOfTransaction</code></td>
+<td><code>boolean</code></td>
+<td>True if this is the last update for this transaction</td>
+</tr>
+<tr class="odd">
+<td>=&gt;5010</td>
+<td><code>TraceId</code></td>
+<td><code>uInt64</code></td>
+<td>Trace Id for internal usage</td>
+</tr>
+</tbody>
+</table>
+<h3 id="orderssnapshot">OrdersSnapshot</h3>
+<p>The <code>OrdersSnapshot</code> message is a full list of active orders. According to the standard, if the book is empty, the snapshot will contain a single entry with <code>Type</code> = <code>EmptyBook</code>.</p>
+<p><code>MessageType</code> = “W” (Market Data - Snapshot / Full Refresh)</p>
+<table>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 23%" />
+<col style="width: 11%" />
+<col style="width: 58%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>5006</td>
+<td><code>FirstFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the first fragment of the update</td>
+</tr>
+<tr class="even">
+<td>893</td>
+<td><code>LastFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the last fragment of the update</td>
+</tr>
+<tr class="odd">
+<td>83</td>
+<td><code>ReportSequenceNo</code></td>
+<td><code>uInt64</code></td>
+<td>Value of <code>ReportSequenceNo</code> field of the incremental update included in this snapshot (FIX name: RptSeq)</td>
+</tr>
+<tr class="even">
+<td>911</td>
+<td><code>TotalReportCount</code></td>
+<td><code>uInt32</code></td>
+<td>Total number of reports (can be used to determine that all reports have been received) (FIX name: TotNumReports)</td>
+</tr>
+<tr class="odd">
+<td>48</td>
+<td><code>InstrumentId</code></td>
+<td><code>uInt32</code></td>
+<td>Instrument ID (FIX name: SecurityId)</td>
+</tr>
+<tr class="even">
+<td>5010</td>
+<td><code>TraceId</code></td>
+<td><code>uInt64</code></td>
+<td>Trace Id for internal usage</td>
+</tr>
+<tr class="odd">
+<td>268</td>
+<td><code>EntryCount</code></td>
+<td><code>length</code></td>
+<td>Number of MDEntry in this message (FIX name: NoMDEntries)</td>
+</tr>
+<tr class="even">
+<td>=&gt;278</td>
+<td><code>Id</code></td>
+<td><code>uInt64</code></td>
+<td>Order ID. Present unless Type is EmptyBook (FIX name: MDEntryID)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;269</td>
+<td><code>EntryType</code></td>
+<td><code>enum</code></td>
+<td>Entry type (FIX name: MDEntryType). Variants: <code>0</code> - Buy, <code>1</code> - Sell, <code>J</code> - EmptyBook</td>
+</tr>
+<tr class="even">
+<td>=&gt;270</td>
+<td><code>Price</code></td>
+<td><code>decimal</code></td>
+<td>Order price. Present unless Type is EmptyBook (FIX name: MDEntryPx)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;271</td>
+<td><code>Size</code></td>
+<td><code>int32</code></td>
+<td>Remaining order size. Present unless Type is EmptyBook (FIX name: MDEntrySize)</td>
+</tr>
+<tr class="even">
+<td>=&gt;1003</td>
+<td><code>TradeId</code></td>
+<td><code>uInt64</code></td>
+<td>ID of the last trade for this order. Only present if there was at least one trade for this order</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tradesincrementalupdate">TradesIncrementalUpdate</h3>
+<p>The <code>TradesIncrementalUpdate</code> message contains the information related to a trade.</p>
+<p><code>MessageType</code> = “X” (Market Data - Incremental Refresh)</p>
+<table>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 23%" />
+<col style="width: 11%" />
+<col style="width: 58%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>5006</td>
+<td><code>FirstFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the first fragment of the update</td>
+</tr>
+<tr class="even">
+<td>893</td>
+<td><code>LastFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the last fragment of the update</td>
+</tr>
+<tr class="odd">
+<td>268</td>
+<td><code>EntryCount</code></td>
+<td><code>length</code></td>
+<td>Number of MDEntry in this message (FIX name: NoMDEntries)</td>
+</tr>
+<tr class="even">
+<td>=&gt;83</td>
+<td><code>ReportSequenceNo</code></td>
+<td><code>uInt64</code></td>
+<td>Report sequence ID (unique monotonically increasing ID, separately for each instrument) (FIX name: RptSeq)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;279</td>
+<td><code>UpdateAction</code></td>
+<td><code>enum</code></td>
+<td>Type of the incremental update (FIX name: MDUpdateAction). Variants: <code>0</code> - New, <code>1</code> - Change, <code>2</code> - Delete</td>
+</tr>
+<tr class="even">
+<td>=&gt;278</td>
+<td><code>Id</code></td>
+<td><code>uInt64</code></td>
+<td>Trade ID (FIX name: MDEntryID)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;269</td>
+<td><code>EntryType</code></td>
+<td><code>enum</code></td>
+<td>Entry type (FIX name: MDEntryType). Variants: <code>2</code> - Trade</td>
+</tr>
+<tr class="even">
+<td>=&gt;48</td>
+<td><code>InstrumentId</code></td>
+<td><code>uInt32</code></td>
+<td>Instrument ID (FIX name: SecurityId)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;270</td>
+<td><code>Price</code></td>
+<td><code>decimal</code></td>
+<td>Trade price (FIX name: MDEntryPx)</td>
+</tr>
+<tr class="even">
+<td>=&gt;271</td>
+<td><code>Size</code></td>
+<td><code>int32</code></td>
+<td>Trade size (FIX name: MDEntrySize)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;5009</td>
+<td><code>TradeType</code></td>
+<td><code>enum</code></td>
+<td>Type of the trade. Variants: <code>Regular</code>, <code>Liquidation</code>, <code>Deleverage</code></td>
+</tr>
+<tr class="even">
+<td>=&gt;5004</td>
+<td><code>AggressiveSide</code></td>
+<td><code>enum</code></td>
+<td>Side of the trade initiator. Variants: <code>Buy</code>, <code>Sell</code></td>
+</tr>
+<tr class="odd">
+<td>=&gt;273</td>
+<td><code>TradingTimestamp</code></td>
+<td><code>timestamp</code></td>
+<td>Time of the trade (FIX name: MDEntryTime)</td>
+</tr>
+<tr class="even">
+<td>=&gt;5005</td>
+<td><code>EndOfTransaction</code></td>
+<td><code>boolean</code></td>
+<td>True if this is the last update for this transaction</td>
+</tr>
+<tr class="odd">
+<td>=&gt;5010</td>
+<td><code>TraceId</code></td>
+<td><code>uInt64</code></td>
+<td>Trace Id for internal usage</td>
+</tr>
+</tbody>
+</table>
+<h3 id="tradessnapshot">TradesSnapshot</h3>
+<p>The <code>TradesSnapshot</code> message contains the information about the last trade for a particular instrument.</p>
+<p><code>MessageType</code> = “W” (Market Data - Snapshot / Full Refresh)</p>
+<table>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 23%" />
+<col style="width: 11%" />
+<col style="width: 58%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>5006</td>
+<td><code>FirstFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the first fragment of the update</td>
+</tr>
+<tr class="even">
+<td>893</td>
+<td><code>LastFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the last fragment of the update</td>
+</tr>
+<tr class="odd">
+<td>83</td>
+<td><code>ReportSequenceNo</code></td>
+<td><code>uInt64</code></td>
+<td>Value of <code>ReportSequenceNo</code> field of the incremental update included in this snapshot (FIX name: RptSeq)</td>
+</tr>
+<tr class="even">
+<td>911</td>
+<td><code>TotalReportCount</code></td>
+<td><code>uInt32</code></td>
+<td>Total number of reports (can be used to determine that all reports have been received) (FIX name: TotNumReports)</td>
+</tr>
+<tr class="odd">
+<td>48</td>
+<td><code>InstrumentId</code></td>
+<td><code>uInt32</code></td>
+<td>Instrument ID (FIX name: SecurityId)</td>
+</tr>
+<tr class="even">
+<td>5010</td>
+<td><code>TraceId</code></td>
+<td><code>uInt64</code></td>
+<td>Trace Id for internal usage</td>
+</tr>
+<tr class="odd">
+<td>268</td>
+<td><code>EntryCount</code></td>
+<td><code>length</code></td>
+<td>Number of MDEntry in this message (at most 1 for trades snapshot, zero if there was no trades) (FIX name: NoMDEntries)</td>
+</tr>
+<tr class="even">
+<td>=&gt;278</td>
+<td><code>Id</code></td>
+<td><code>uInt64</code></td>
+<td>Trade ID (FIX name: MDEntryID)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;269</td>
+<td><code>EntryType</code></td>
+<td><code>enum</code></td>
+<td>Entry type (FIX name: MDEntryType). Variants: <code>2</code> - Trade</td>
+</tr>
+<tr class="even">
+<td>=&gt;270</td>
+<td><code>Price</code></td>
+<td><code>decimal</code></td>
+<td>Trade price (FIX name: MDEntryPx)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;271</td>
+<td><code>Size</code></td>
+<td><code>int32</code></td>
+<td>Trade size (FIX name: MDEntrySize)</td>
+</tr>
+<tr class="even">
+<td>=&gt;5009</td>
+<td><code>TradeType</code></td>
+<td><code>enum</code></td>
+<td>Type of the trade. Variants: <code>Regular</code>, <code>Liquidation</code>, <code>Deleverage</code></td>
+</tr>
+<tr class="odd">
+<td>=&gt;5004</td>
+<td><code>AggressiveSide</code></td>
+<td><code>enum</code></td>
+<td>Side of the trade initiator. Variants: <code>Buy</code>, <code>Sell</code></td>
+</tr>
+<tr class="even">
+<td>=&gt;273</td>
+<td><code>TradingTimestamp</code></td>
+<td><code>timestamp</code></td>
+<td>Time of the trade (FIX name: MDEntryTime)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="bookincrementalupdate">BookIncrementalUpdate</h3>
+<p>The <code>BookIncrementalUpdate</code> message is used to show the following actions: adding, updating, or deleting an entry in the aggregated order book. Please note that a single update message is sent when entries are added or removed from the aggregated order book. The listener should infer the changes of all entries below the place of modification.</p>
+<p><code>MessageType</code> = “X” (Market Data - Incremental Refresh)</p>
+<table>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 23%" />
+<col style="width: 11%" />
+<col style="width: 58%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>5006</td>
+<td><code>FirstFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the first fragment of the update</td>
+</tr>
+<tr class="even">
+<td>893</td>
+<td><code>LastFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the last fragment of the update</td>
+</tr>
+<tr class="odd">
+<td>268</td>
+<td><code>EntryCount</code></td>
+<td><code>length</code></td>
+<td>Number of MDEntry in this message (FIX name: NoMDEntries)</td>
+</tr>
+<tr class="even">
+<td>=&gt;83</td>
+<td><code>ReportSequenceNo</code></td>
+<td><code>uInt64</code></td>
+<td>Report sequence ID (unique monotonically increasing ID, separately for each instrument) (FIX name: RptSeq)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;279</td>
+<td><code>UpdateAction</code></td>
+<td><code>enum</code></td>
+<td>Type of the incremental update. Not present if entry type is EmptyBook (FIX name: MDUpdateAction). Variants: <code>0</code> - New, <code>1</code> - Change, <code>2</code> - Delete</td>
+</tr>
+<tr class="even">
+<td>=&gt;269</td>
+<td><code>EntryType</code></td>
+<td><code>enum</code></td>
+<td>Entry type (FIX name: MDEntryType). Variants: <code>0</code> - Buy, <code>1</code> - Sell, <code>J</code> - EmptyBook</td>
+</tr>
+<tr class="odd">
+<td>=&gt;48</td>
+<td><code>InstrumentId</code></td>
+<td><code>uInt32</code></td>
+<td>Instrument ID (FIX name: SecurityId)</td>
+</tr>
+<tr class="even">
+<td>=&gt;1023</td>
+<td><code>PriceLevel</code></td>
+<td><code>uInt32</code></td>
+<td>Price level (from 1 to market depth). Not present if entry type is EmptyBook (FIX name: MDPriceLevel)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;270</td>
+<td><code>Price</code></td>
+<td><code>decimal</code></td>
+<td>Price at this price level. Not present if entry type is EmptyBook (FIX name: MDEntryPx)</td>
+</tr>
+<tr class="even">
+<td>=&gt;271</td>
+<td><code>Size</code></td>
+<td><code>int32</code></td>
+<td>Total size of orders at this price level. Not present if entry type is EmptyBook (FIX name: MDEntrySize)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;273</td>
+<td><code>TradingTimestamp</code></td>
+<td><code>timestamp</code></td>
+<td>Time of the update (FIX name: MDEntryTime)</td>
+</tr>
+<tr class="even">
+<td>=&gt;5005</td>
+<td><code>EndOfTransaction</code></td>
+<td><code>boolean</code></td>
+<td>True if this is the last update for this transaction</td>
+</tr>
+<tr class="odd">
+<td>=&gt;5010</td>
+<td><code>TraceId</code></td>
+<td><code>uInt64</code></td>
+<td>Trace Id for internal usage</td>
+</tr>
+</tbody>
+</table>
+<h3 id="booksnapshot">BookSnapshot</h3>
+<p>The <code>BookSnapshot</code> message is an order book aggregated by the market depth. According to the standard, if the book is empty, the snapshot will contain a single entry with <code>Type</code> = <code>EmptyBook</code>.</p>
+<p><code>MessageType</code> = “W” (Market Data - Snapshot / Full Refresh)</p>
+<table>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 23%" />
+<col style="width: 11%" />
+<col style="width: 58%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>5006</td>
+<td><code>FirstFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the first fragment of the update</td>
+</tr>
+<tr class="even">
+<td>893</td>
+<td><code>LastFragment</code></td>
+<td><code>uInt32</code></td>
+<td>True if this is the last fragment of the update</td>
+</tr>
+<tr class="odd">
+<td>83</td>
+<td><code>ReportSequenceNo</code></td>
+<td><code>uInt64</code></td>
+<td>Value of <code>ReportSequenceNo</code> field of the incremental update included in this snapshot (FIX name: RptSeq)</td>
+</tr>
+<tr class="even">
+<td>911</td>
+<td><code>TotalReportCount</code></td>
+<td><code>uInt32</code></td>
+<td>Total number of reports (can be used to determine that all reports have been received) (FIX name: TotNumReports)</td>
+</tr>
+<tr class="odd">
+<td>48</td>
+<td><code>InstrumentId</code></td>
+<td><code>uInt32</code></td>
+<td>Instrument ID (FIX name: SecurityId)</td>
+</tr>
+<tr class="even">
+<td>5010</td>
+<td><code>TraceId</code></td>
+<td><code>uInt64</code></td>
+<td>Trace Id for internal usage</td>
+</tr>
+<tr class="odd">
+<td>268</td>
+<td><code>EntryCount</code></td>
+<td><code>length</code></td>
+<td>Number of MDEntry in this message (FIX name: NoMDEntries)</td>
+</tr>
+<tr class="even">
+<td>=&gt;269</td>
+<td><code>EntryType</code></td>
+<td><code>enum</code></td>
+<td>Entry type (FIX name: MDEntryType). Variants: <code>0</code> - Buy, <code>1</code> - Sell, <code>J</code> - EmptyBook</td>
+</tr>
+<tr class="odd">
+<td>=&gt;1023</td>
+<td><code>PriceLevel</code></td>
+<td><code>uInt32</code></td>
+<td>Price level (from 1 to market depth). Not present if entry type is EmptyBook (FIX name: MDPriceLevel)</td>
+</tr>
+<tr class="even">
+<td>=&gt;270</td>
+<td><code>Price</code></td>
+<td><code>decimal</code></td>
+<td>Price at this price level. Present unless Type is EmptyBook (FIX name: MDEntryPx)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;271</td>
+<td><code>Size</code></td>
+<td><code>int32</code></td>
+<td>Total size of orders at this price level. Present unless Type is EmptyBook (FIX name: MDEntrySize)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="instrumentstatus">InstrumentStatus</h3>
+<p>The <code>InstrumentStatus</code> message contains the information about current parameters of the instrument.</p>
+<p><code>MessageType</code> = “f” (Security Status)</p>
+<table>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 23%" />
+<col style="width: 11%" />
+<col style="width: 58%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>48</td>
+<td><code>InstrumentId</code></td>
+<td><code>uInt32</code></td>
+<td>Unique numeric ID of the instrument (FIX name: SecurityId)</td>
+</tr>
+<tr class="even">
+<td>326</td>
+<td><code>TradingStatus</code></td>
+<td><code>enum</code></td>
+<td>Trading status for this instrument (FIX name: SecurityTradingStatus). Variants: <code>2</code> - Halted, <code>17</code> - Normal, <code>101</code> - CancelOnly</td>
+</tr>
+<tr class="odd">
+<td>5002</td>
+<td><code>SellPriceBand</code></td>
+<td><code>decimal</code></td>
+<td>Minimum allowed sell price</td>
+</tr>
+<tr class="even">
+<td>5003</td>
+<td><code>BuyPriceBand</code></td>
+<td><code>decimal</code></td>
+<td>Maximum allowed buy price</td>
+</tr>
+<tr class="odd">
+<td>5008</td>
+<td><code>MarkPrice</code></td>
+<td><code>decimal</code></td>
+<td>Mark price of the instrument</td>
+</tr>
+<tr class="even">
+<td>5010</td>
+<td><code>TraceId</code></td>
+<td><code>uInt64</code></td>
+<td>Trace Id for internal usage</td>
+</tr>
+<tr class="odd">
+<td>746</td>
+<td><code>OpenInterest</code></td>
+<td><code>int64</code></td>
+<td>Open interest for this instrument</td>
+</tr>
+<tr class="even">
+<td>5011</td>
+<td><code>TimeUntilFunding</code> <sup>(since v2)</sup></td>
+<td><code>timestamp</code></td>
+<td>Estimated time until the next funding</td>
+</tr>
+<tr class="odd">
+<td>5012</td>
+<td><code>EstimatedFundingRate</code> <sup>(since v2)</sup></td>
+<td><code>decimal</code></td>
+<td>Estimated rate for the next funding</td>
+</tr>
+</tbody>
+</table>
+<h3 id="instrumentdefinition">InstrumentDefinition</h3>
+<p>The <code>InstrumentDefinition</code> message contains the information about an instrument.</p>
+<p><code>MessageType</code> = “d” (Security definition)</p>
+<table>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 23%" />
+<col style="width: 11%" />
+<col style="width: 58%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>911</td>
+<td><code>TotalReportCount</code></td>
+<td><code>uInt32</code></td>
+<td>Total number of reports (can be used to determine that all reports have been received) (FIX name: TotNumReports)</td>
+</tr>
+<tr class="even">
+<td>48</td>
+<td><code>InstrumentId</code></td>
+<td><code>uInt32</code></td>
+<td>Unique numeric ID of the instrument (FIX name: SecurityId)</td>
+</tr>
+<tr class="odd">
+<td>55</td>
+<td><code>Symbol</code></td>
+<td><code>string</code></td>
+<td>Textual instrument ID</td>
+</tr>
+<tr class="even">
+<td>15</td>
+<td><code>PriceCurrency</code></td>
+<td><code>string</code></td>
+<td>Currency used for price (FIX name: Currency)</td>
+</tr>
+<tr class="odd">
+<td>120</td>
+<td><code>SettlementCurrency</code></td>
+<td><code>string</code></td>
+<td>Currency code of settlement denomination (FIX name: SettlCurrency)</td>
+</tr>
+<tr class="even">
+<td>1079</td>
+<td><code>MaturityTime</code></td>
+<td><code>timestamp</code></td>
+<td>Maturity time of the instrument (only if applicable)</td>
+</tr>
+<tr class="odd">
+<td>969</td>
+<td><code>MinPriceIncrement</code></td>
+<td><code>decimal</code></td>
+<td>Minimal price increment</td>
+</tr>
+<tr class="even">
+<td>5010</td>
+<td><code>TraceId</code></td>
+<td><code>uInt64</code></td>
+<td>Trace Id for internal usage</td>
+</tr>
+<tr class="odd">
+<td>1141</td>
+<td><code>FeedTypeCount</code></td>
+<td><code>length</code></td>
+<td>Total number of market data feeds in the following list (FIX name: NoMDFeedTypes)</td>
+</tr>
+<tr class="even">
+<td>=&gt;1022</td>
+<td><code>FeedType</code></td>
+<td><code>string</code></td>
+<td>Feed identifier: “Orders”, “Trades”, “Book1”, “Book5”, “Book25” (FIX name: MDFeedType)</td>
+</tr>
+<tr class="odd">
+<td>=&gt;264</td>
+<td><code>MarketDepth</code></td>
+<td><code>uInt32</code></td>
+<td>Market depth, e.g. 1, 5, 25. Only for book feeds</td>
+</tr>
+<tr class="even">
+<td>=&gt;1021</td>
+<td><code>BookType</code></td>
+<td><code>enum</code></td>
+<td>Book type. Only for book feeds (FIX name: MDBookType). Variants: <code>1</code> - TopOfBook (1x1), <code>2</code> - PriceDepth (5x5, 25x25)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="fundingevent-since-v2">FundingEvent <sup>(since v2)</sup></h3>
+<p>Information about a processed funding.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Tag</th>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>5010</td>
+<td><code>TraceId</code></td>
+<td><code>uInt64</code></td>
+<td>Trace Id for internal usage</td>
+</tr>
+<tr class="even">
+<td>48</td>
+<td><code>InstrumentId</code></td>
+<td><code>uInt32</code></td>
+<td>Instrument ID (FIX name: SecurityId)</td>
+</tr>
+<tr class="odd">
+<td>273</td>
+<td><code>TradingTimestamp</code></td>
+<td><code>timestamp</code></td>
+<td>Time of the event (FIX name: MDEntryTime)</td>
+</tr>
+<tr class="even">
+<td>5013</td>
+<td><code>Rate</code></td>
+<td><code>decimal</code></td>
+<td>Funding rate</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

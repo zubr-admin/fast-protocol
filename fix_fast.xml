@@ -1,0 +1,714 @@
+<!-- @version 2 -->
+<templates xmlns="http://www.fixprotocol.org/ns/fast/td/1.1">
+    <!--
+        `SequenceReset` is the message sent when the gate resets its message counter.
+        After the sequence reset is sent, the next message will get the specified `MsgSeqNum`.
+    -->
+    <template name="SequenceReset" id="1">
+        <!-- (FIX name: ApplVerID) -->
+        <string name="AppliedVersionId" id="1128">
+            <constant value="9"/>
+        </string>
+        <!-- (FIX name: MsgType) -->
+        <string name="MessageType" id="35">
+            <!-- Sequence reset -->
+            <constant value="4"/>
+        </string>
+        <!-- (FIX name: MsgSeqNum) -->
+        <uInt64 name="MessageSequenceNo" id="34"/>
+        <timestamp name="SendingTime" id="52" unit="nanosecond"/>
+        <!-- Sequence number of the next message in the feed (FIX name: NewSeqNo) -->
+        <uInt64 name="NewSequenceNo" id="36"/>
+    </template>
+    <!--
+        The `Heartbeat` message is sent to a feed when there haven't been any other messages for some time.
+        The heartbeat message doesn't have any additional fields except the standard header.
+    -->
+    <template name="Heartbeat" id="2">
+        <!-- (FIX name: ApplVerID) -->
+        <string name="AppliedVersionId" id="1128">
+            <constant value="9"/>
+        </string>
+        <!-- (FIX name: MsgType) -->
+        <string name="MessageType" id="35">
+            <!-- Heartbeat -->
+            <constant value="0"/>
+        </string>
+        <!-- (FIX name: MsgSeqNum) -->
+        <uInt64 name="MessageSequenceNo" id="34"/>
+        <timestamp name="SendingTime" id="52" unit="nanosecond"/>
+    </template>
+    <!--
+        The `OrdersIncrementalUpdate` message is used to show the following actions:
+        adding, updating, or deleting of an order.
+    -->
+    <template name="OrdersIncrementalUpdate" id="3">
+        <!-- (FIX name: ApplVerID) -->
+        <string name="AppliedVersionId" id="1128">
+            <constant value="9"/>
+        </string>
+        <!-- (FIX name: MsgType) -->
+        <string name="MessageType" id="35">
+            <!-- Market Data - Incremental Refresh -->
+            <constant value="X"/>
+        </string>
+        <!-- (FIX name: MsgSeqNum) -->
+        <uInt64 name="MessageSequenceNo" id="34"/>
+        <timestamp name="SendingTime" id="52" unit="nanosecond"/>
+        <!-- True if this is the first fragment of the update -->
+        <uInt32 name="FirstFragment" id="5006"/>
+        <!-- True if this is the last fragment of the update -->
+        <uInt32 name="LastFragment" id="893"/>
+        <uInt64 name="_Reserved1" id="5901" presence="optional"/>
+        <uInt64 name="_Reserved2" id="5902" presence="optional"/>
+        <uInt64 name="_Reserved3" id="5903" presence="optional"/>
+        <!-- (FIX name: MDEntries) -->
+        <sequence name="Entries">
+            <!-- Number of MDEntry in this message (FIX name: NoMDEntries) -->
+            <length name="EntryCount" id="268"/>
+            <!--
+                Report sequence ID (unique monotonically increasing ID,
+                separately for each instrument)
+                (FIX name: RptSeq)
+            -->
+            <uInt64 name="ReportSequenceNo" id="83"/>
+            <!--
+                Type of the incremental update.
+                Not present if entry type is EmptyBook
+                (FIX name: MDUpdateAction)
+            -->
+            <enum name="UpdateAction" id="279" presence="optional">
+                <!-- `New` -->
+                <element name="0"/>
+                <!-- `Change` -->
+                <element name="1"/>
+                <!-- `Delete` -->
+                <element name="2"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!--
+                Order ID. Not present if entry type is EmptyBook
+                (FIX name: MDEntryID)
+            -->
+            <uInt64 name="Id" id="278" presence="optional"/>
+            <!-- Entry type (FIX name: MDEntryType) -->
+            <enum name="EntryType" id="269">
+                <!-- `Buy` -->
+                <element name="0"/>
+                <!-- `Sell` -->
+                <element name="1"/>
+                <!-- `EmptyBook` -->
+                <element name="J"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!-- Instrument ID (FIX name: SecurityId) -->
+            <uInt32 name="InstrumentId" id="48"/>
+            <!-- Order price. Not present if entry type is EmptyBook (FIX name: MDEntryPx) -->
+            <decimal name="Price" id="270" presence="optional"/>
+            <!--
+                Depends on the update type: for New - order size; for Change - remaining order size;
+                for Delete - remaining size of the order before deletion.
+                Not present if entry type is EmptyBook (FIX name: MDEntrySize)
+            -->
+            <int32 name="Size" id="271" presence="optional"/>
+            <!-- Order type. Not present if entry type is EmptyBook (FIX name: OrdType) -->
+            <enum name="OrderType" id="40" presence="optional">
+                <!-- `Limit` -->
+                <element name="2"/>
+                <!-- `Market` -->
+                <element name="1"/>
+                <!-- `PostOnly` -->
+                <element name="101"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!-- Time in force. Not present if entry type is EmptyBook -->
+            <enum name="TimeInForce" id="59" presence="optional">
+                <!-- `GoodTillCancel` (GTC) -->
+                <element name="1"/>
+                <!-- `ImmediateOrCancel` (IOC) -->
+                <element name="3"/>
+                <!-- `FillOrKill` (FOK) -->
+                <element name="4"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!-- Reason of deletion. Only present when `UpdateAction` = 2 (Delete) -->
+            <enum name="DeleteReason" id="5007" presence="optional">
+                <element name="Fulfilled"/>
+                <element name="OrderType"/>
+                <element name="TimeInForce"/>
+                <element name="CrossTrade"/>
+                <element name="CancelRequest"/>
+                <element name="ReplaceRequest"/>
+                <element name="Liquidation"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!-- ID of the trade that caused this update. Only present for updates caused by order execution -->
+            <uInt64 name="TradeId" id="1003" presence="optional"/>
+            <!--
+                Price of the trade that caused this update.
+                Only present for updates caused by order execution (FIX name: LastPx)
+            -->
+            <decimal name="TradePrice" id="31" presence="optional"/>
+            <!--
+                Size of the trade that caused this update.
+                Only present for updates caused by order execution (FIX name: LastQty)
+            -->
+            <int32 name="TradeSize" id="32" presence="optional"/>
+            <!-- Time of the update (FIX name: MDEntryTime) -->
+            <timestamp name="TradingTimestamp" id="273" unit="nanosecond"/>
+            <!-- True if this is the last update for this transaction -->
+            <boolean name="EndOfTransaction" id="5005"/>
+            <!-- Trace Id for internal usage -->
+            <uInt64 name="TraceId" id="5010"/>
+            <uInt64 name="_Reserved11" id="5911" presence="optional"/>
+            <uInt64 name="_Reserved12" id="5912" presence="optional"/>
+            <uInt64 name="_Reserved13" id="5913" presence="optional"/>
+        </sequence>
+    </template>
+    <!--
+        The `OrdersSnapshot` message is a full list of active orders.
+        According to the standard, if the book is empty, the snapshot will contain
+        a single entry with `Type` = `EmptyBook`.
+    -->
+    <template name="OrdersSnapshot" id="4">
+        <!-- (FIX name: ApplVerID) -->
+        <string name="AppliedVersionId" id="1128">
+            <constant value="9"/>
+        </string>
+        <!-- (FIX name: MsgType) -->
+        <string name="MessageType" id="35">
+            <!-- Market Data - Snapshot / Full Refresh -->
+            <constant value="W"/>
+        </string>
+        <!-- (FIX name: MsgSeqNum) -->
+        <uInt64 name="MessageSequenceNo" id="34"/>
+        <timestamp name="SendingTime" id="52" unit="nanosecond"/>
+        <!-- True if this is the first fragment of the update -->
+        <uInt32 name="FirstFragment" id="5006"/>
+        <!-- True if this is the last fragment of the update -->
+        <uInt32 name="LastFragment" id="893"/>
+        <!--
+            Value of `ReportSequenceNo` field of the incremental update
+            included in this snapshot (FIX name: RptSeq)
+        -->
+        <uInt64 name="ReportSequenceNo" id="83"/>
+        <!--
+            Total number of reports (can be used to determine that
+            all reports have been received) (FIX name: TotNumReports)
+        -->
+        <uInt32 name="TotalReportCount" id="911"/>
+        <!-- Instrument ID (FIX name: SecurityId) -->
+        <uInt32 name="InstrumentId" id="48"/>
+        <!-- Trace Id for internal usage -->
+        <uInt64 name="TraceId" id="5010"/>
+        <uInt64 name="_Reserved1" id="5901" presence="optional"/>
+        <uInt64 name="_Reserved2" id="5902" presence="optional"/>
+        <uInt64 name="_Reserved3" id="5903" presence="optional"/>
+        <!-- (FIX name: MDEntries) -->
+        <sequence name="Entries">
+            <!-- Number of MDEntry in this message (FIX name: NoMDEntries) -->
+            <length name="EntryCount" id="268"/>
+            <!-- Order ID. Present unless Type is EmptyBook (FIX name: MDEntryID) -->
+            <uInt64 name="Id" id="278" presence="optional"/>
+            <!-- Entry type (FIX name: MDEntryType) -->
+            <enum name="EntryType" id="269">
+                <!-- `Buy` -->
+                <element name="0"/>
+                <!-- `Sell` -->
+                <element name="1"/>
+                <!-- `EmptyBook` -->
+                <element name="J"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!-- Order price. Present unless Type is EmptyBook (FIX name: MDEntryPx) -->
+            <decimal name="Price" id="270" presence="optional"/>
+            <!-- Remaining order size. Present unless Type is EmptyBook (FIX name: MDEntrySize) -->
+            <int32 name="Size" id="271" presence="optional"/>
+            <!--
+                ID of the last trade for this order.
+                Only present if there was at least one trade for this order
+            -->
+            <uInt64 name="TradeId" id="1003" presence="optional"/>
+            <uInt64 name="_Reserved11" id="5911" presence="optional"/>
+            <uInt64 name="_Reserved12" id="5912" presence="optional"/>
+            <uInt64 name="_Reserved13" id="5913" presence="optional"/>
+            <uInt64 name="_Reserved14" id="5914" presence="optional"/>
+        </sequence>
+    </template>
+    <!-- The `TradesIncrementalUpdate` message contains the information related to a trade. -->
+    <template name="TradesIncrementalUpdate" id="5">
+        <!-- (FIX name: ApplVerID) -->
+        <string name="AppliedVersionId" id="1128">
+            <constant value="9"/>
+        </string>
+        <!-- (FIX name: MsgType) -->
+        <string name="MessageType" id="35">
+            <!-- Market Data - Incremental Refresh -->
+            <constant value="X"/>
+        </string>
+        <!-- (FIX name: MsgSeqNum) -->
+        <uInt64 name="MessageSequenceNo" id="34"/>
+        <timestamp name="SendingTime" id="52" unit="nanosecond"/>
+        <!-- True if this is the first fragment of the update -->
+        <uInt32 name="FirstFragment" id="5006"/>
+        <!-- True if this is the last fragment of the update -->
+        <uInt32 name="LastFragment" id="893"/>
+        <uInt64 name="_Reserved1" id="5901" presence="optional"/>
+        <uInt64 name="_Reserved2" id="5902" presence="optional"/>
+        <uInt64 name="_Reserved3" id="5903" presence="optional"/>
+        <!-- (FIX name: MDEntries) -->
+        <sequence name="Entries">
+            <!-- Number of MDEntry in this message (FIX name: NoMDEntries) -->
+            <length name="EntryCount" id="268"/>
+            <!--
+                Report sequence ID (unique monotonically increasing ID,
+                separately for each instrument)
+                (FIX name: RptSeq)
+            -->
+            <uInt64 name="ReportSequenceNo" id="83"/>
+            <!--
+                Type of the incremental update
+                (FIX name: MDUpdateAction)
+            -->
+            <enum name="UpdateAction" id="279">
+                <!-- `New` -->
+                <element name="0"/>
+                <!-- `Change` -->
+                <element name="1"/>
+                <!-- `Delete` -->
+                <element name="2"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!-- Trade ID (FIX name: MDEntryID) -->
+            <uInt64 name="Id" id="278"/>
+            <!-- Entry type (FIX name: MDEntryType) -->
+            <enum name="EntryType" id="269">
+                <!-- `Trade` -->
+                <constant value="2"/>
+            </enum>
+            <!-- Instrument ID (FIX name: SecurityId) -->
+            <uInt32 name="InstrumentId" id="48"/>
+            <!-- Trade price (FIX name: MDEntryPx) -->
+            <decimal name="Price" id="270"/>
+            <!-- Trade size (FIX name: MDEntrySize) -->
+            <int32 name="Size" id="271"/>
+            <!-- Type of the trade -->
+            <enum name="TradeType" id="5009">
+                <element name="Regular"/>
+                <element name="Liquidation"/>
+                <element name="Deleverage"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!-- Side of the trade initiator -->
+            <enum name="AggressiveSide" id="5004">
+                <element name="Buy"/>
+                <element name="Sell"/>
+            </enum>
+            <!-- Time of the trade (FIX name: MDEntryTime) -->
+            <timestamp name="TradingTimestamp" id="273" unit="nanosecond"/>
+            <!-- True if this is the last update for this transaction -->
+            <boolean name="EndOfTransaction" id="5005"/>
+            <!-- Trace Id for internal usage -->
+            <uInt64 name="TraceId" id="5010"/>
+            <uInt64 name="_Reserved11" id="5911" presence="optional"/>
+            <uInt64 name="_Reserved12" id="5912" presence="optional"/>
+            <uInt64 name="_Reserved13" id="5913" presence="optional"/>
+        </sequence>
+    </template>
+    <!-- The `TradesSnapshot` message contains the information about the last trade for a particular instrument. -->
+    <template name="TradesSnapshot" id="6">
+        <!-- (FIX name: ApplVerID) -->
+        <string name="AppliedVersionId" id="1128">
+            <constant value="9"/>
+        </string>
+        <!-- (FIX name: MsgType) -->
+        <string name="MessageType" id="35">
+            <!-- Market Data - Snapshot / Full Refresh -->
+            <constant value="W"/>
+        </string>
+        <!-- (FIX name: MsgSeqNum) -->
+        <uInt64 name="MessageSequenceNo" id="34"/>
+        <timestamp name="SendingTime" id="52" unit="nanosecond"/>
+        <!-- True if this is the first fragment of the update -->
+        <uInt32 name="FirstFragment" id="5006"/>
+        <!-- True if this is the last fragment of the update -->
+        <uInt32 name="LastFragment" id="893"/>
+        <!--
+            Value of `ReportSequenceNo` field of the incremental update
+            included in this snapshot (FIX name: RptSeq)
+        -->
+        <uInt64 name="ReportSequenceNo" id="83"/>
+        <!--
+            Total number of reports (can be used to determine that
+            all reports have been received) (FIX name: TotNumReports)
+        -->
+        <uInt32 name="TotalReportCount" id="911"/>
+        <!-- Instrument ID (FIX name: SecurityId) -->
+        <uInt32 name="InstrumentId" id="48"/>
+        <!-- Trace Id for internal usage -->
+        <uInt64 name="TraceId" id="5010"/>
+        <uInt64 name="_Reserved1" id="5901" presence="optional"/>
+        <uInt64 name="_Reserved2" id="5902" presence="optional"/>
+        <uInt64 name="_Reserved3" id="5903" presence="optional"/>
+        <!-- (FIX name: MDEntries) -->
+        <sequence name="Entries">
+            <!--
+                Number of MDEntry in this message (at most 1 for trades snapshot, zero if there was no trades)
+                (FIX name: NoMDEntries)
+            -->
+            <length name="EntryCount" id="268"/>
+            <!-- Trade ID (FIX name: MDEntryID) -->
+            <uInt64 name="Id" id="278"/>
+            <!-- Entry type (FIX name: MDEntryType) -->
+            <enum name="EntryType" id="269">
+                <!-- `Trade` -->
+                <constant value="2"/>
+            </enum>
+            <!-- Trade price (FIX name: MDEntryPx) -->
+            <decimal name="Price" id="270"/>
+            <!-- Trade size (FIX name: MDEntrySize) -->
+            <int32 name="Size" id="271"/>
+            <!-- Type of the trade -->
+            <enum name="TradeType" id="5009">
+                <element name="Regular"/>
+                <element name="Liquidation"/>
+                <element name="Deleverage"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!-- Side of the trade initiator -->
+            <enum name="AggressiveSide" id="5004">
+                <element name="Buy"/>
+                <element name="Sell"/>
+            </enum>
+            <!-- Time of the trade (FIX name: MDEntryTime) -->
+            <timestamp name="TradingTimestamp" id="273" unit="nanosecond"/>
+            <uInt64 name="_Reserved11" id="5911" presence="optional"/>
+            <uInt64 name="_Reserved12" id="5912" presence="optional"/>
+            <uInt64 name="_Reserved13" id="5913" presence="optional"/>
+        </sequence>
+    </template>
+    <!--
+        The `BookIncrementalUpdate` message is used to show the following actions:
+        adding, updating, or deleting an entry in the aggregated order book.
+        Please note that a single update message is sent
+        when entries are added or removed from the aggregated order book.
+        The listener should infer the changes of all entries
+        below the place of modification.
+    -->
+    <template name="BookIncrementalUpdate" id="7">
+        <!-- (FIX name: ApplVerID) -->
+        <string name="AppliedVersionId" id="1128">
+            <constant value="9"/>
+        </string>
+        <!-- (FIX name: MsgType) -->
+        <string name="MessageType" id="35">
+            <!-- Market Data - Incremental Refresh -->
+            <constant value="X"/>
+        </string>
+        <!-- (FIX name: MsgSeqNum) -->
+        <uInt64 name="MessageSequenceNo" id="34"/>
+        <timestamp name="SendingTime" id="52" unit="nanosecond"/>
+        <!-- True if this is the first fragment of the update -->
+        <uInt32 name="FirstFragment" id="5006"/>
+        <!-- True if this is the last fragment of the update -->
+        <uInt32 name="LastFragment" id="893"/>
+        <uInt64 name="_Reserved1" id="5901" presence="optional"/>
+        <uInt64 name="_Reserved2" id="5902" presence="optional"/>
+        <uInt64 name="_Reserved3" id="5903" presence="optional"/>
+        <!-- (FIX name: MDEntries) -->
+        <sequence name="Entries">
+            <!-- Number of MDEntry in this message (FIX name: NoMDEntries) -->
+            <length name="EntryCount" id="268"/>
+            <!--
+                Report sequence ID (unique monotonically increasing ID,
+                separately for each instrument)
+                (FIX name: RptSeq)
+            -->
+            <uInt64 name="ReportSequenceNo" id="83"/>
+            <!--
+                Type of the incremental update.
+                Not present if entry type is EmptyBook
+                (FIX name: MDUpdateAction)
+            -->
+            <enum name="UpdateAction" id="279" presence="optional">
+                <!-- `New` -->
+                <element name="0"/>
+                <!-- `Change` -->
+                <element name="1"/>
+                <!-- `Delete` -->
+                <element name="2"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!-- Entry type (FIX name: MDEntryType) -->
+            <enum name="EntryType" id="269">
+                <!-- `Buy` -->
+                <element name="0"/>
+                <!-- `Sell` -->
+                <element name="1"/>
+                <!-- `EmptyBook` -->
+                <element name="J"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!-- Instrument ID (FIX name: SecurityId) -->
+            <uInt32 name="InstrumentId" id="48"/>
+            <!--
+                Price level (from 1 to market depth).
+                Not present if entry type is EmptyBook (FIX name: MDPriceLevel)
+            -->
+            <uInt32 name="PriceLevel" id="1023" presence="optional"/>
+            <!--
+                Price at this price level. Not present if entry type is EmptyBook
+                (FIX name: MDEntryPx)
+            -->
+            <decimal name="Price" id="270" presence="optional"/>
+            <!--
+                Total size of orders at this price level.
+                Not present if entry type is EmptyBook (FIX name: MDEntrySize)
+            -->
+            <int32 name="Size" id="271" presence="optional"/>
+            <!-- Time of the update (FIX name: MDEntryTime) -->
+            <timestamp name="TradingTimestamp" id="273" unit="nanosecond"/>
+            <!-- True if this is the last update for this transaction -->
+            <boolean name="EndOfTransaction" id="5005"/>
+            <!-- Trace Id for internal usage -->
+            <uInt64 name="TraceId" id="5010"/>
+            <uInt64 name="_Reserved11" id="5911" presence="optional"/>
+            <uInt64 name="_Reserved12" id="5912" presence="optional"/>
+            <uInt64 name="_Reserved13" id="5913" presence="optional"/>
+        </sequence>
+    </template>
+    <!--
+        The `BookSnapshot` message is an order book aggregated by the market depth.
+        According to the standard, if the book is empty, the snapshot will contain a single entry
+        with `Type` = `EmptyBook`.
+    -->
+    <template name="BookSnapshot" id="8">
+        <!-- (FIX name: ApplVerID) -->
+        <string name="AppliedVersionId" id="1128">
+            <constant value="9"/>
+        </string>
+        <!-- (FIX name: MsgType) -->
+        <string name="MessageType" id="35">
+            <!-- Market Data - Snapshot / Full Refresh -->
+            <constant value="W"/>
+        </string>
+        <!-- (FIX name: MsgSeqNum) -->
+        <uInt64 name="MessageSequenceNo" id="34"/>
+        <timestamp name="SendingTime" id="52" unit="nanosecond"/>
+        <!-- True if this is the first fragment of the update -->
+        <uInt32 name="FirstFragment" id="5006"/>
+        <!-- True if this is the last fragment of the update -->
+        <uInt32 name="LastFragment" id="893"/>
+        <!--
+            Value of `ReportSequenceNo` field of the incremental update
+            included in this snapshot (FIX name: RptSeq)
+        -->
+        <uInt64 name="ReportSequenceNo" id="83"/>
+        <!--
+            Total number of reports (can be used to determine that
+            all reports have been received) (FIX name: TotNumReports)
+        -->
+        <uInt32 name="TotalReportCount" id="911"/>
+        <!-- Instrument ID (FIX name: SecurityId) -->
+        <uInt32 name="InstrumentId" id="48"/>
+        <!-- Trace Id for internal usage -->
+        <uInt64 name="TraceId" id="5010"/>
+        <uInt64 name="_Reserved1" id="5901" presence="optional"/>
+        <uInt64 name="_Reserved2" id="5902" presence="optional"/>
+        <uInt64 name="_Reserved3" id="5903" presence="optional"/>
+        <!-- (FIX name: MDEntries) -->
+        <sequence name="Entries">
+            <!-- Number of MDEntry in this message (FIX name: NoMDEntries) -->
+            <length name="EntryCount" id="268"/>
+            <!-- Entry type (FIX name: MDEntryType) -->
+            <enum name="EntryType" id="269">
+                <!-- `Buy` -->
+                <element name="0"/>
+                <!-- `Sell` -->
+                <element name="1"/>
+                <!-- `EmptyBook` -->
+                <element name="J"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <!--
+                Price level (from 1 to market depth).
+                Not present if entry type is EmptyBook (FIX name: MDPriceLevel)
+            -->
+            <uInt32 name="PriceLevel" id="1023" presence="optional"/>
+            <!-- Price at this price level. Present unless Type is EmptyBook  (FIX name: MDEntryPx) -->
+            <decimal name="Price" id="270" presence="optional"/>
+            <!--
+                Total size of orders at this price level.
+                Present unless Type is EmptyBook (FIX name: MDEntrySize)
+            -->
+            <int32 name="Size" id="271" presence="optional"/>
+            <uInt64 name="_Reserved11" id="5911" presence="optional"/>
+            <uInt64 name="_Reserved12" id="5912" presence="optional"/>
+            <uInt64 name="_Reserved13" id="5913" presence="optional"/>
+            <uInt64 name="_Reserved14" id="5914" presence="optional"/>
+        </sequence>
+    </template>
+    <!-- The `InstrumentStatus` message contains the information about current parameters of the instrument. -->
+    <template name="InstrumentStatus" id="9">
+        <!-- (FIX name: ApplVerID) -->
+        <string name="AppliedVersionId" id="1128">
+            <constant value="9"/>
+        </string>
+        <!-- (FIX name: MsgType) -->
+        <string name="MessageType" id="35">
+            <!-- Security Status -->
+            <constant value="f"/>
+        </string>
+        <!-- (FIX name: MsgSeqNum) -->
+        <uInt64 name="MessageSequenceNo" id="34"/>
+        <timestamp name="SendingTime" id="52" unit="nanosecond"/>
+        <!-- Unique numeric ID of the instrument (FIX name: SecurityId) -->
+        <uInt32 name="InstrumentId" id="48"/>
+        <!-- Trading status for this instrument (FIX name: SecurityTradingStatus) -->
+        <enum name="TradingStatus" id="326">
+            <!-- `Halted` -->
+            <element name="2"/>
+            <!-- `Normal` -->
+            <element name="17"/>
+            <!-- `CancelOnly` -->
+            <element name="101"/>
+            <element name="_Reserved1"/>
+            <element name="_Reserved2"/>
+            <element name="_Reserved3"/>
+        </enum>
+        <!-- Minimum allowed sell price -->
+        <decimal name="SellPriceBand" id="5002"/>
+        <!-- Maximum allowed buy price -->
+        <decimal name="BuyPriceBand" id="5003"/>
+        <!-- Mark price of the instrument -->
+        <decimal name="MarkPrice" id="5008"/>
+        <!-- Trace Id for internal usage -->
+        <uInt64 name="TraceId" id="5010"/>
+        <!-- Open interest for this instrument -->
+        <int64 name="OpenInterest" id="746"/>
+        <!--
+            Estimated time until the next funding
+            @sinceVersion 2
+        -->
+        <timestamp name="TimeUntilFunding" id="5011" unit="nanosecond"/>
+        <!--
+            Estimated rate for the next funding
+            @sinceVersion 2
+        -->
+        <decimal name="EstimatedFundingRate" id="5012"/>
+        <uInt64 name="_Reserved1" id="5901" presence="optional"/>
+        <uInt64 name="_Reserved2" id="5902" presence="optional"/>
+        <uInt64 name="_Reserved3" id="5903" presence="optional"/>
+        <uInt64 name="_Reserved4" id="5905" presence="optional"/>
+        <uInt64 name="_Reserved5" id="5906" presence="optional"/>
+        <uInt64 name="_Reserved6" id="5907" presence="optional"/>
+    </template>
+    <!-- The `InstrumentDefinition` message contains the information about an instrument. -->
+    <template name="InstrumentDefinition" id="10">
+        <!-- (FIX name: ApplVerID) -->
+        <string name="AppliedVersionId" id="1128">
+            <constant value="9"/>
+        </string>
+        <!-- (FIX name: MsgType) -->
+        <string name="MessageType" id="35">
+            <!-- Security definition -->
+            <constant value="d"/>
+        </string>
+        <!-- (FIX name: MsgSeqNum) -->
+        <uInt64 name="MessageSequenceNo" id="34"/>
+        <timestamp name="SendingTime" id="52" unit="nanosecond"/>
+        <!--
+            Total number of reports (can be used to determine that
+            all reports have been received) (FIX name: TotNumReports)
+        -->
+        <uInt32 name="TotalReportCount" id="911"/>
+        <!-- Unique numeric ID of the instrument (FIX name: SecurityId) -->
+        <uInt32 name="InstrumentId" id="48"/>
+        <!-- Textual instrument ID -->
+        <string name="Symbol" id="55" charset="unicode"/>
+        <!-- Currency used for price (FIX name: Currency) -->
+        <string name="PriceCurrency" id="15" charset="unicode"/>
+        <!-- Currency code of settlement denomination (FIX name: SettlCurrency) -->
+        <string name="SettlementCurrency" id="120" charset="unicode"/>
+        <!-- Maturity time of the instrument (only if applicable) -->
+        <timestamp name="MaturityTime" id="1079" unit="nanosecond" presence="optional"/>
+        <!-- Minimal price increment -->
+        <decimal name="MinPriceIncrement" id="969"/>
+        <!-- Trace Id for internal usage -->
+        <uInt64 name="TraceId" id="5010"/>
+        <uInt64 name="_Reserved1" id="5901" presence="optional"/>
+        <uInt64 name="_Reserved2" id="5902" presence="optional"/>
+        <uInt64 name="_Reserved3" id="5903" presence="optional"/>
+        <uInt64 name="_Reserved4" id="5904" presence="optional"/>
+        <uInt64 name="_Reserved5" id="5905" presence="optional"/>
+        <sequence name="FeedTypes">
+            <!-- Total number of market data feeds in the following list (FIX name: NoMDFeedTypes) -->
+            <length name="FeedTypeCount" id="1141"/>
+            <!-- Feed identifier: "Orders", "Trades", "Book1", "Book5", "Book25" (FIX name: MDFeedType) -->
+            <string name="FeedType" id="1022" charset="unicode"/>
+            <!-- Market depth, e.g. 1, 5, 25. Only for book feeds -->
+            <uInt32 name="MarketDepth" id="264" presence="optional"/>
+            <!-- Book type. Only for book feeds (FIX name: MDBookType) -->
+            <enum name="BookType" id="1021" presence="optional">
+                <!-- `TopOfBook` (1x1) -->
+                <element name="1"/>
+                <!-- `PriceDepth` (5x5, 25x25) -->
+                <element name="2"/>
+                <element name="_Reserved1"/>
+                <element name="_Reserved2"/>
+                <element name="_Reserved3"/>
+            </enum>
+            <uInt64 name="_Reserved11" id="5911" presence="optional"/>
+            <uInt64 name="_Reserved12" id="5912" presence="optional"/>
+            <uInt64 name="_Reserved13" id="5913" presence="optional"/>
+        </sequence>
+    </template>
+    <!--
+        Information about a processed funding.
+        @sinceVersion 2
+    -->
+    <template name="FundingEvent" id="11">
+        <!-- (FIX name: ApplVerID) -->
+        <string name="AppliedVersionId" id="1128">
+            <constant value="9"/>
+        </string>
+        <!-- (FIX name: MsgSeqNum) -->
+        <uInt64 name="MessageSequenceNo" id="34"/>
+        <timestamp name="SendingTime" id="52" unit="nanosecond"/>
+        <!-- Trace Id for internal usage -->
+        <uInt64 name="TraceId" id="5010"/>
+        <!-- Instrument ID (FIX name: SecurityId) -->
+        <uInt32 name="InstrumentId" id="48"/>
+        <!-- Time of the event (FIX name: MDEntryTime) -->
+        <timestamp name="TradingTimestamp" id="273" unit="nanosecond"/>
+        <!-- Funding rate -->
+        <decimal name="Rate" id="5013"/>
+        <uInt64 name="_Reserved1" id="5901" presence="optional"/>
+        <uInt64 name="_Reserved2" id="5902" presence="optional"/>
+        <uInt64 name="_Reserved3" id="5903" presence="optional"/>
+    </template>
+</templates>
